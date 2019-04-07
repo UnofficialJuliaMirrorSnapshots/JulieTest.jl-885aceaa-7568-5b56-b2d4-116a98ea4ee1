@@ -1,0 +1,111 @@
+#!/bin/sh
+
+JULIE_USAGE=\
+"Usage: julie [commands] arguments [options]
+
+\033[1;3mCommands:\033[0m
+    init  initialize JulieTest directory
+  module  create basic module template
+   start  start JulieTest to watch the directory
+  single  run all test then exit
+    help  print this help
+
+\033[1;3mOptions:\033[0m
+  --reporter=dot  use specified reporter
+  --skip-init     skip running all test at start
+
+\033[1;3mExamples:\033[0m
+  julie init
+  julie module first second
+  julie start -p 4
+"
+
+JULIE_TEST_CONFIG_TEMPLATE=\
+"#JulieTest config file
+  
+include(Pkg.dir(\"JulieTest/src/watch.jl\"))
+
+# Configure the watcher
+
+watch = [\"src\", \"test\"]
+interval = 0.25 # in seconds
+
+# Configure the test runner
+
+# reporter = \"dot\"
+reporter = \"spec\"
+
+# start JulieTest
+julieTest()"
+
+getModuleTemplate() { echo \
+"module $1
+ 
+end"
+}
+
+getModuleTestTemplate() { echo \
+"module $1_test
+reload(\"\$(pwd())/src/$1.jl\")
+using $1, JulieTest
+
+# Write your test here
+
+describe(\"$1\") do
+  it(\"should pass\") do
+    @is 1 => 1
+  end
+end
+
+end"
+}
+
+create() {
+  if [ ! -e "$(pwd)/$1" ]; then
+    printf "\033[32mcreate file\033[0m $(pwd)/$1\n"
+    echo "$2" > $1
+  fi
+}
+
+init(){
+  for dir in src test; do
+    if [ ! -e "$dir" ]; then
+      printf "\033[32mcreate directory\033[0m $(pwd)/$dir \n"
+      mkdir "$(pwd)/$dir"
+    fi
+  done
+  create testConfig.jl "$JULIE_TEST_CONFIG_TEMPLATE"
+}
+
+case $1 in
+  init)
+    init
+    ;;
+  module)
+    init
+    shift
+    while [ "$1" != "" ]; do
+      create src/$1.jl "`getModuleTemplate $1`"
+      create test/$1_test.jl "`getModuleTestTemplate $1`"
+      shift
+    done
+    ;;
+  single)
+    shift
+    julia $(pwd)/testConfig.jl --single $@
+    ;;
+  start)
+    shift
+    echo "Loading julia... May take a while"
+    julia $(pwd)/testConfig.jl $@
+    while true; do
+      echo "WARNING: Julia exited with an error"
+      echo "Will skip all test on enter to avoid error"
+      julia $(pwd)/testConfig.jl --skip-init $@
+      sleep 2
+    done
+    ;;
+  *)
+    printf "$JULIE_USAGE"
+esac
+

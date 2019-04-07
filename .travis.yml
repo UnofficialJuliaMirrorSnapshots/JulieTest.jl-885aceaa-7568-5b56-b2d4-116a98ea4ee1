@@ -1,0 +1,22 @@
+language: cpp
+compiler:
+  - clang
+notifications:
+  email: false
+env:
+  matrix:
+    - JULIAVERSION="juliareleases"
+    - JULIAVERSION="julianightlies"
+before_install:
+  - sudo add-apt-repository ppa:staticfloat/julia-deps -y
+  - sudo add-apt-repository ppa:staticfloat/${JULIAVERSION} -y
+  - sudo apt-get update -qq -y
+  - sudo apt-get install libpcre3-dev julia -y
+script:
+  - julia -e 'Pkg.init(); Pkg.clone(pwd());'
+  - for i in src/reporter/*; do ./bin/julie single testConfig.jl --reporter=$(basename $i .jl); done
+  - mkdir .testTmp
+  - cd .testTmp
+  - ../bin/julie init
+  - ../bin/julie module sample
+  - ../bin/julie single
